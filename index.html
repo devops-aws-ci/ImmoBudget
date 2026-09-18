@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b7285">
+<meta name="description" content="Simulateur personnel de trésorerie : effet d'une épargne dédiée au remboursement d'un crédit immobilier. 100% local, aucune donnée envoyée.">
+<title>ImmoBudget — Simulateur d'épargne crédit</title>
+<style>
+  :root{
+    --bg:#f4f6f8;
+    --card:#ffffff;
+    --ink:#12232e;
+    --muted:#5b6b76;
+    --line:#e2e8ee;
+    --brand:#0b7285;
+    --brand-ink:#0b7285;
+    --brand-soft:#e4f3f5;
+    --accent:#1c7c54;
+    --accent-soft:#e3f3ea;
+    --warn:#b45309;
+    --warn-soft:#fdf1de;
+    --danger:#b02a37;
+    --danger-soft:#fbe9eb;
+    --shadow:0 2px 10px rgba(18,35,46,.06),0 8px 24px rgba(18,35,46,.05);
+    --radius:16px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0e1418;
+      --card:#161f26;
+      --ink:#eaf1f4;
+      --muted:#9fb1bc;
+      --line:#26343d;
+      --brand:#3bb6c9;
+      --brand-ink:#7fd4e0;
+      --brand-soft:#123138;
+      --accent:#5bd39a;
+      --accent-soft:#122f24;
+      --warn:#f0b45e;
+      --warn-soft:#33270f;
+      --danger:#f28b95;
+      --danger-soft:#331519;
+      --shadow:0 2px 10px rgba(0,0,0,.35),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+      --bg:#0e1418;--card:#161f26;--ink:#eaf1f4;--muted:#9fb1bc;--line:#26343d;
+      --brand:#3bb6c9;--brand-ink:#7fd4e0;--brand-soft:#123138;--accent:#5bd39a;
+      --accent-soft:#122f24;--warn:#f0b45e;--warn-soft:#33270f;--danger:#f28b95;
+      --danger-soft:#331519;--shadow:0 2px 10px rgba(0,0,0,.35),0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji",sans-serif;
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:20px 16px 48px}
+  header.app{margin:8px 0 20px}
+  header.app h1{font-size:1.4rem;margin:0 0 4px;letter-spacing:-.02em}
+  header.app p{margin:0;color:var(--muted);font-size:.92rem}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:18px 16px;
+    margin:14px 0;
+  }
+  .card h2{
+    font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--muted);margin:0 0 14px;font-weight:700;
+  }
+  .field{margin:0 0 14px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-weight:600;font-size:.95rem;margin-bottom:6px}
+  .field .hint{display:block;font-weight:400;color:var(--muted);font-size:.8rem;margin-top:4px}
+  .inp{position:relative;display:flex;align-items:center}
+  .inp input{
+    width:100%;font-size:1.25rem;font-weight:700;
+    padding:14px 44px 14px 14px;
+    border:1.5px solid var(--line);border-radius:12px;
+    background:var(--bg);color:var(--ink);
+    -moz-appearance:textfield;
+  }
+  .inp input::-webkit-outer-spin-button,.inp input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .inp input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+  .inp .unit{position:absolute;right:14px;color:var(--muted);font-weight:600;pointer-events:none}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:420px){.grid2{grid-template-columns:1fr}}
+
+  /* Hero result */
+  .hero{
+    background:linear-gradient(135deg,var(--brand-soft),var(--card));
+    border:1px solid var(--line);
+  }
+  .hero .lead{color:var(--muted);font-size:.9rem;margin:0 0 2px;font-weight:600}
+  .hero .big{
+    font-size:2.9rem;line-height:1.05;font-weight:800;letter-spacing:-.03em;
+    color:var(--brand-ink);margin:2px 0 2px;
+  }
+  .hero .big small{font-size:1rem;font-weight:600;color:var(--muted)}
+  .hero .sub{font-size:1.05rem;font-weight:600;margin-top:6px}
+  .hero .sub .chip{color:var(--accent)}
+  .banner{
+    margin-top:14px;padding:12px 14px;border-radius:12px;font-size:.92rem;font-weight:600;
+    display:flex;gap:8px;align-items:flex-start;
+  }
+  .banner.ok{background:var(--accent-soft);color:var(--accent)}
+  .banner.warn{background:var(--warn-soft);color:var(--warn)}
+  .banner.err{background:var(--danger-soft);color:var(--danger)}
+  .banner .ic{font-size:1.05rem;line-height:1.3}
+
+  /* metrics */
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .metric{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .metric .k{font-size:.78rem;color:var(--muted);font-weight:600;margin-bottom:4px}
+  .metric .v{font-size:1.25rem;font-weight:800;letter-spacing:-.02em}
+
+  /* inverse mode */
+  .quick{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 14px}
+  .quick button{
+    border:1.5px solid var(--line);background:var(--card);color:var(--ink);
+    border-radius:999px;padding:8px 14px;font-weight:700;font-size:.95rem;cursor:pointer;
+  }
+  .quick button.active{background:var(--brand);border-color:var(--brand);color:#fff}
+  input[type=range]{width:100%;accent-color:var(--brand);height:28px}
+  .rangelabels{display:flex;justify-content:space-between;color:var(--muted);font-size:.78rem;margin-top:-4px}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:.98rem}
+  th,td{padding:11px 8px;text-align:right;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  thead th{color:var(--muted);font-size:.76rem;text-transform:uppercase;letter-spacing:.05em}
+  tbody tr.hl td{background:var(--brand-soft);font-weight:800}
+  td.need{font-weight:800;color:var(--brand-ink)}
+  .cover{color:var(--muted);font-size:.82rem;font-weight:600}
+
+  /* synthesis */
+  .synth{list-style:none;margin:0;padding:0}
+  .synth li{
+    display:flex;gap:10px;align-items:baseline;
+    padding:11px 2px;border-bottom:1px dashed var(--line);
+  }
+  .synth li:last-child{border-bottom:0}
+  .synth .em{font-size:1.15rem;width:1.6rem;flex:0 0 auto;text-align:center}
+  .synth .lab{color:var(--muted);flex:1;font-size:.94rem}
+  .synth .val{font-weight:800;letter-spacing:-.01em;text-align:right}
+
+  .note{font-size:.82rem;color:var(--muted);margin-top:10px}
+  footer.disc{
+    margin-top:22px;font-size:.82rem;color:var(--muted);
+    background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:12px 14px;font-weight:600;
+  }
+  .toggle{
+    position:absolute;top:14px;right:14px;border:1px solid var(--line);background:var(--card);
+    color:var(--muted);border-radius:999px;width:38px;height:38px;font-size:1.1rem;cursor:pointer;
+  }
+  .apphead{position:relative}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="app apphead">
+    <button class="toggle" id="themeBtn" title="Basculer le thème clair / sombre" aria-label="Basculer le thème">🌓</button>
+    <h1>🏠 ImmoBudget</h1>
+    <p>Simulateur personnel de trésorerie : effet d'une épargne dédiée au remboursement de votre crédit.</p>
+  </header>
+
+  <!-- ENTRÉES -->
+  <section class="card">
+    <h2>Paramètres du crédit</h2>
+    <div class="field">
+      <label for="mens">Mensualité contractuelle</label>
+      <div class="inp"><input id="mens" type="number" inputmode="decimal" step="1" value="1713"><span class="unit">€ / mois</span></div>
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label for="rest">Mensualités restantes</label>
+        <div class="inp"><input id="rest" type="number" inputmode="numeric" step="1" value="176"><span class="unit">mois</span></div>
+      </div>
+      <div class="field">
+        <label for="epargne">Épargne disponible</label>
+        <div class="inp"><input id="epargne" type="number" inputmode="decimal" step="1" value="125488"><span class="unit">€</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RÉSULTAT PRINCIPAL : répartition de l'épargne sur toute la durée -->
+  <section class="card hero">
+    <p class="lead">Si je lisse mon épargne sur toutes les mensualités restantes</p>
+    <div class="big" id="heroReal">— <small>/ mois</small></div>
+    <div class="sub">Complément payé par l'épargne : <span class="chip" id="heroComp">—</span> / mois</div>
+    <div class="sub" style="font-size:.98rem;color:var(--muted)">Épargne nécessaire jusqu'à la fin : <strong id="heroNeed">—</strong></div>
+    <div class="banner ok" id="heroBanner"><span class="ic">✅</span><span id="heroBannerTxt">—</span></div>
+
+    <div class="metrics" style="margin-top:14px">
+      <div class="metric"><div class="k">Épargne utilisée / mois</div><div class="v" id="mUsed">—</div></div>
+      <div class="metric"><div class="k">Payé depuis mes revenus</div><div class="v" id="mIncome">—</div></div>
+      <div class="metric"><div class="k">Mois couverts par l'épargne</div><div class="v" id="mMonths">—</div></div>
+      <div class="metric"><div class="k">Épargne restante à la fin</div><div class="v" id="mLeft">—</div></div>
+    </div>
+  </section>
+
+  <!-- MODE INVERSE -->
+  <section class="card">
+    <h2>Mode inverse — je choisis ma mensualité réelle</h2>
+    <div class="field">
+      <label for="target">Je veux payer seulement depuis mes revenus</label>
+      <div class="inp"><input id="target" type="number" inputmode="decimal" step="10" value="1000"><span class="unit">€ / mois</span></div>
+    </div>
+    <div class="quick" id="quickBtns"></div>
+    <input id="targetRange" type="range" min="0" max="1713" step="10" value="1000">
+    <div class="rangelabels"><span>0 €</span><span id="rangeMax">1 713 €</span></div>
+
+    <div class="metrics" style="margin-top:12px">
+      <div class="metric"><div class="k">Complément / mois</div><div class="v" id="invComp">—</div></div>
+      <div class="metric"><div class="k">Épargne nécessaire</div><div class="v" id="invNeed">—</div></div>
+    </div>
+    <div class="banner ok" id="invBanner" style="margin-top:12px"><span class="ic">✅</span><span id="invBannerTxt">—</span></div>
+  </section>
+
+  <!-- TABLEAU OBJECTIFS -->
+  <section class="card">
+    <h2>Objectifs mensuels — épargne nécessaire</h2>
+    <table>
+      <thead>
+        <tr><th>Objectif mensuel</th><th>Épargne nécessaire</th><th>Couverture</th></tr>
+      </thead>
+      <tbody id="goalsBody"></tbody>
+    </table>
+    <p class="note">« Épargne nécessaire » = (mensualité contractuelle − objectif) × mensualités restantes. « Couverture » indique combien de mois votre épargne actuelle tiendrait à ce rythme.</p>
+  </section>
+
+  <!-- DURÉE DU CRÉDIT -->
+  <section class="card">
+    <h2>Durée du crédit</h2>
+    <div class="grid2">
+      <div class="field">
+        <label for="total">Durée totale du crédit</label>
+        <div class="inp"><input id="total" type="number" inputmode="decimal" step="1" value="20"><span class="unit">ans</span></div>
+      </div>
+      <div class="field">
+        <label for="paid">Années déjà payées</label>
+        <div class="inp"><input id="paid" type="number" inputmode="decimal" step="0.25" value="5"><span class="unit">ans</span></div>
+        <span class="hint">Crédit débuté en juin 2021 — saisissez des décimales (ex. 5,25 = 5 ans 3 mois).</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="k">✅ Déjà payé</div><div class="v" id="dPaid">—</div></div>
+      <div class="metric"><div class="k">⏳ Restant</div><div class="v" id="dLeft">—</div></div>
+    </div>
+    <div class="banner ok" id="coverBanner" style="margin-top:12px">
+      <span class="ic">📅</span>
+      <span>Épargne <strong id="coverEp">—</strong> — équivalent : <strong id="coverEq">—</strong> de mensualités.</span>
+    </div>
+  </section>
+
+  <!-- SYNTHÈSE -->
+  <section class="card">
+    <h2>Synthèse</h2>
+    <ul class="synth">
+      <li><span class="em">🏠</span><span class="lab">Durée totale du crédit</span><span class="val" id="sTotal">—</span></li>
+      <li><span class="em">✅</span><span class="lab">Déjà payé</span><span class="val" id="sPaid">—</span></li>
+      <li><span class="em">⏳</span><span class="lab">Restant à payer</span><span class="val" id="sLeft">—</span></li>
+      <li><span class="em">💰</span><span class="lab">Épargne disponible</span><span class="val" id="sEp">—</span></li>
+      <li><span class="em">📅</span><span class="lab">Équivalent de l'épargne</span><span class="val" id="sEq">—</span></li>
+      <li><span class="em">💳</span><span class="lab">Mensualité contractuelle</span><span class="val" id="sMens">—</span></li>
+      <li><span class="em">👤</span><span class="lab">Effort mensuel réel simulé</span><span class="val" id="sReal">—</span></li>
+      <li><span class="em">🏦</span><span class="lab">Complément pris dans l'épargne</span><span class="val" id="sComp">—</span></li>
+    </ul>
+    <p class="note">⚠️ « Déjà payé » (durée écoulée du crédit) et « Équivalent de l'épargne » (nombre de mensualités que votre épargne représente) sont deux informations bien distinctes.</p>
+  </section>
+
+  <footer class="disc">
+    ⚠️ Simulation mathématique de trésorerie uniquement. Ceci n'est pas un remboursement anticipé réel ni une modification de votre contrat bancaire : la banque prélève toujours la mensualité contractuelle. Tout le calcul s'effectue localement dans votre navigateur, aucune donnée n'est envoyée sur Internet.
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Formatage ----------
+  var eur0 = new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0});
+  var eur2 = new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
+  function money(x){ if(!isFinite(x)) return '—'; return eur0.format(Math.round(x)); }
+  function money2(x){ if(!isFinite(x)) return '—'; return eur2.format(x); }
+
+  // Convertit un nombre de mois en "X ans Y mois"
+  function monthsToText(totalMonths){
+    if(!isFinite(totalMonths) || totalMonths < 0) return '—';
+    var m = Math.round(totalMonths);
+    var y = Math.floor(m/12);
+    var r = m % 12;
+    var parts = [];
+    if(y > 0) parts.push(y + (y>1 ? ' ans' : ' an'));
+    if(r > 0) parts.push(r + ' mois');
+    if(parts.length === 0) return '0 mois';
+    return parts.join(' ');
+  }
+  function yearsToText(years){ return monthsToText((Number(years)||0)*12); }
+
+  // ---------- Helpers DOM ----------
+  function $(id){ return document.getElementById(id); }
+  function num(id){ var v = parseFloat($(id).value.replace(',','.')); return isNaN(v) ? NaN : v; }
+  function set(id,txt){ var el=$(id); if(el) el.textContent = txt; }
+  function banner(id,txtId,cls,ic,txt){
+    var el=$(id); if(!el) return;
+    el.className = 'banner ' + cls;
+    el.querySelector('.ic').textContent = ic;
+    $(txtId).textContent = txt;
+  }
+
+  var GOALS = [1500,1400,1300,1200,1100,1000];
+
+  // ---------- Calcul principal ----------
+  function recompute(){
+    var mens = num('mens');
+    var rest = num('rest');
+    var ep   = num('epargne');
+
+    // Validation des entrées de base
+    var validMens = isFinite(mens) && mens > 0;
+    var validRest = isFinite(rest) && rest > 0;
+    var validEp   = isFinite(ep) && ep >= 0;
+
+    // ===== Section principale : lissage de l'épargne sur toute la durée =====
+    if(!validMens){
+      set('heroReal','—');
+      banner('heroBanner','heroBannerTxt','err','⚠️','Saisissez une mensualité contractuelle valide (> 0).');
+    } else if(!validRest){
+      set('heroReal','—');
+      banner('heroBanner','heroBannerTxt','warn','⏳','Aucune mensualité restante : le crédit est déjà terminé.');
+      set('heroComp','—'); set('heroNeed','—');
+      set('mUsed','—'); set('mIncome','—'); set('mMonths','—'); set('mLeft','—');
+    }
+
+    if(validMens && validRest){
+      var e = validEp ? ep : 0;
+      // Épargne théoriquement mobilisable = elle ne peut pas dépasser ce qui reste à payer
+      var maxUse = mens * rest;                 // couverture totale possible
+      var usable = Math.min(e, maxUse);         // part réellement utile
+      var perMonth = usable / rest;             // complément lissé par mois
+      var real = mens - perMonth;               // mensualité réelle depuis revenus
+      var leftEnd = e - usable;                 // épargne restante à la fin (si surplus)
+
+      set('heroReal', money(real) + ' ');
+      $('heroReal').innerHTML = money(real) + ' <small>/ mois</small>';
+      set('heroComp', money(perMonth) + ' / mois');
+      set('heroNeed', money(usable));
+
+      set('mUsed', money(perMonth));
+      set('mIncome', money(real));
+      set('mMonths', rest + ' mois');
+      set('mLeft', money(leftEnd));
+
+      if(e <= 0){
+        banner('heroBanner','heroBannerTxt','warn','ℹ️',
+          'Sans épargne, vous payez la mensualité complète de ' + money(mens) + ' depuis vos revenus.');
+      } else if(e >= maxUse){
+        banner('heroBanner','heroBannerTxt','ok','✅',
+          'Votre épargne couvre l\'intégralité du crédit. Il resterait ' + money(leftEnd) + ' à la fin (mensualité réelle nulle).');
+      } else {
+        banner('heroBanner','heroBannerTxt','ok','✅',
+          'Épargne lissée jusqu\'à la fin : elle atteint exactement 0 € au terme du crédit.');
+      }
+    }
+
+    // ===== Mode inverse =====
+    computeInverse(mens, rest, (validEp?ep:0), validMens, validRest);
+
+    // ===== Tableau objectifs =====
+    buildGoals(mens, rest, (validEp?ep:0), validMens, validRest);
+
+    // ===== Durée =====
+    computeDuration(mens, ep, validMens, validEp);
+
+    // ===== Synthèse =====
+    fillSynthesis(mens, rest, ep, validMens, validRest, validEp);
+  }
+
+  // ---------- Mode inverse ----------
+  function computeInverse(mens, rest, ep, validMens, validRest){
+    var target = num('target');
+    if(!validMens || !isFinite(target)){
+      set('invComp','—'); set('invNeed','—');
+      banner('invBanner','invBannerTxt','warn','⚠️','Saisissez une mensualité et un objectif valides.');
+      return;
+    }
+    if(target < 0) target = 0;
+
+    if(target >= mens){
+      set('invComp', money(0));
+      set('invNeed', money(0));
+      banner('invBanner','invBannerTxt','ok','✅',
+        'Objectif ≥ mensualité contractuelle : aucune épargne n\'est nécessaire, vous payez tout depuis vos revenus.');
+      return;
+    }
+
+    var comp = mens - target;                       // complément mensuel
+    var need = validRest ? comp * rest : NaN;        // épargne nécessaire sur toute la durée
+    set('invComp', money(comp) + ' / mois');
+    set('invNeed', isFinite(need) ? money(need) : '—');
+
+    if(!validRest){
+      banner('invBanner','invBannerTxt','warn','⏳','Renseignez les mensualités restantes pour estimer l\'épargne nécessaire.');
+      return;
+    }
+
+    if(ep <= 0){
+      banner('invBanner','invBannerTxt','warn','ℹ️',
+        'Il faudrait ' + money(need) + ' d\'épargne pour tenir ' + rest + ' mois à ' + money(target) + ' / mois.');
+    } else if(ep >= need){
+      var surplus = ep - need;
+      banner('invBanner','invBannerTxt','ok','✅',
+        'Votre épargne (' + money(ep) + ') suffit pour toute la durée' +
+        (surplus > 0 ? ' — surplus de ' + money(surplus) + '.' : ' (juste ce qu\'il faut).'));
+    } else {
+      var monthsCovered = Math.floor(ep / comp);
+      banner('invBanner','invBannerTxt','warn','⚠️',
+        'Épargne insuffisante : elle sera épuisée après ' + monthsCovered + ' mois (' + monthsToText(monthsCovered) +
+        '). Ensuite, mensualité complète de ' + money(mens) + ' à payer.');
+    }
+  }
+
+  // ---------- Tableau objectifs ----------
+  function buildGoals(mens, rest, ep, validMens, validRest){
+    var body = $('goalsBody');
+    body.innerHTML = '';
+    var currentTarget = Math.round(num('target'));
+    GOALS.forEach(function(g){
+      var tr = document.createElement('tr');
+      if(g === currentTarget) tr.className = 'hl';
+      var need = (validMens && validRest) ? (mens - g) * rest : NaN;
+      var coverTxt = '—';
+      if(validMens && g < mens){
+        var comp = mens - g;
+        if(ep > 0){
+          if(isFinite(need) && ep >= need){ coverTxt = 'toute la durée'; }
+          else { coverTxt = Math.floor(ep / comp) + ' mois'; }
+        }
+      } else if(validMens && g >= mens){
+        coverTxt = 'aucune épargne';
+      }
+      tr.innerHTML =
+        '<td>' + money(g) + '</td>' +
+        '<td class="need">' + (isFinite(need) && need>=0 ? money(need) : (g>=mens?money(0):'—')) + '</td>' +
+        '<td class="cover">' + coverTxt + '</td>';
+      body.appendChild(tr);
+    });
+  }
+
+  // ---------- Durée ----------
+  function computeDuration(mens, ep, validMens, validEp){
+    var total = num('total');
+    var paid  = num('paid');
+    var vTotal = isFinite(total) && total > 0;
+    var vPaid  = isFinite(paid) && paid >= 0;
+
+    if(vTotal && vPaid){
+      var left = Math.max(0, total - paid);
+      set('dPaid', yearsToText(paid));
+      set('dLeft', yearsToText(left));
+    } else {
+      set('dPaid','—'); set('dLeft','—');
+    }
+
+    if(validMens && validEp && mens > 0){
+      var monthsCovered = ep / mens;              // mois de mensualités que l'épargne représente
+      set('coverEp', money(ep));
+      set('coverEq', monthsToText(monthsCovered) +
+        ' (' + (Math.round(monthsCovered*100)/100).toLocaleString('fr-FR') + ' mois)');
+    } else {
+      set('coverEp','—'); set('coverEq','—');
+    }
+  }
+
+  // ---------- Synthèse ----------
+  function fillSynthesis(mens, rest, ep, validMens, validRest, validEp){
+    var total = num('total'), paid = num('paid');
+    set('sTotal', (isFinite(total)&&total>0) ? yearsToText(total) : '—');
+    set('sPaid',  (isFinite(paid)&&paid>=0)  ? yearsToText(paid)  : '—');
+    set('sLeft',  (isFinite(total)&&isFinite(paid)) ? yearsToText(Math.max(0,total-paid)) : '—');
+    set('sEp',    validEp ? money(ep) : '—');
+    set('sEq',    (validMens && validEp && mens>0) ? monthsToText(ep/mens) : '—');
+    set('sMens',  validMens ? money(mens) : '—');
+
+    if(validMens && validRest){
+      var e = validEp ? ep : 0;
+      var usable = Math.min(e, mens*rest);
+      var perMonth = usable / rest;
+      set('sReal', money(mens - perMonth));
+      set('sComp', money(perMonth));
+    } else {
+      set('sReal','—'); set('sComp','—');
+    }
+  }
+
+  // ---------- Mode inverse : boutons rapides + curseur ----------
+  function buildQuick(){
+    var host = $('quickBtns');
+    host.innerHTML = '';
+    GOALS.forEach(function(g){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = money(g);
+      b.dataset.val = g;
+      b.addEventListener('click', function(){
+        $('target').value = g;
+        $('targetRange').value = g;
+        recompute();
+        markQuick();
+      });
+      host.appendChild(b);
+    });
+  }
+  function markQuick(){
+    var cur = Math.round(num('target'));
+    Array.prototype.forEach.call($('quickBtns').children, function(b){
+      b.classList.toggle('active', parseInt(b.dataset.val,10) === cur);
+    });
+  }
+  function syncRangeMax(){
+    var mens = num('mens');
+    var max = (isFinite(mens) && mens>0) ? Math.round(mens) : 1713;
+    $('targetRange').max = max;
+    set('rangeMax', money(max));
+  }
+
+  // ---------- Câblage des événements ----------
+  ['mens','rest','epargne','target','total','paid'].forEach(function(id){
+    $(id).addEventListener('input', function(){
+      if(id === 'mens') syncRangeMax();
+      if(id === 'target'){
+        var v = num('target');
+        if(isFinite(v)) $('targetRange').value = v;
+        markQuick();
+      }
+      recompute();
+    });
+  });
+  $('targetRange').addEventListener('input', function(){
+    $('target').value = this.value;
+    markQuick();
+    recompute();
+  });
+
+  // ---------- Thème ----------
+  (function themeInit(){
+    var saved = null;
+    try{ saved = localStorage.getItem('immobudget-theme'); }catch(e){}
+    if(saved) document.documentElement.setAttribute('data-theme', saved);
+    $('themeBtn').addEventListener('click', function(){
+      var cur = document.documentElement.getAttribute('data-theme');
+      var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var next;
+      if(cur === 'dark') next = 'light';
+      else if(cur === 'light') next = 'dark';
+      else next = prefersDark ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try{ localStorage.setItem('immobudget-theme', next); }catch(e){}
+    });
+  })();
+
+  // ---------- Init ----------
+  buildQuick();
+  syncRangeMax();
+  markQuick();
+  recompute();
+})();
+</script>
+</body>
+</html>
