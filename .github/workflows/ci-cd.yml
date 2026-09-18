@@ -1,0 +1,111 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  id-token: write   # OIDC vers AWS
+  contents: read
+
+jobs:
+  # ── CI : la page est purement statique, on valide simplement le fichier ──
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vérifier index.html
+        run: |
+          test -s index.html                       # présent et non vide
+          grep -q '<!DOCTYPE html>' index.html     # bien un document HTML
+          grep -q 'ImmoBudget' index.html          # bien la bonne page
+          echo "index.html valide."
+
+  # ── CD : sur push main uniquement, déploiement sur l'EC2 via SSM ──────────
+  deploy:
+    needs: [validate]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency: deploy-immobudget-prod   # jamais 2 déploiements en parallèle
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-west-1   # même région que l'EC2
+
+      # Aucun SSH, aucune clé AWS longue durée : tout passe par SSM. La page
+      # étant statique et versionnée dans git, aucun artefact/S3 n'est nécessaire —
+      # l'EC2 récupère la dernière version via `git reset --hard origin/main`.
+      - name: Lancer le script de déploiement via SSM
+        id: ssm
+        run: |
+          CMD="cd /root/projects/immobudget && git fetch origin && git reset --hard origin/main && bash ops/PROD/update-last-version.sh"
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy immobudget ${{ github.sha }}" \
+            --parameters commands="[\"$CMD\"]" \
+            --timeout-seconds 600 \
+            --query "Command.CommandId" --output text)
+          echo "cmd_id=$CMD_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Attendre la fin et vérifier
+        timeout-minutes: 15
+        # -e retiré volontairement : une erreur transitoire d'un appel SSM ne
+        # doit pas avorter le step (voir la boucle ci-dessous).
+        shell: bash -uo pipefail {0}
+        run: |
+          CMD_ID="${{ steps.ssm.outputs.cmd_id }}"
+          INSTANCE_ID="${{ secrets.EC2_INSTANCE_ID }}"
+
+          # Si CE step est interrompu (job annulé, nouveau push, timeout), on
+          # annule explicitement la commande SSM : sans ça, elle continue côté
+          # EC2 et un run suivant lancerait un déploiement concurrent.
+          cancel_ssm() {
+            echo "Interruption détectée → annulation de la commande SSM $CMD_ID"
+            aws ssm cancel-command --command-id "$CMD_ID" --instance-ids "$INSTANCE_ID" || true
+          }
+          trap cancel_ssm INT TERM
+
+          # `aws ssm wait command-executed` abandonne après ~100 s (fixe). On
+          # poll donc nous-mêmes, en tolérant les erreurs transitoires
+          # (InvocationDoesNotExist juste après send-command, throttling → Unknown)
+          # et avec une borne DEADLINE propre < timeout-minutes du step.
+          DEADLINE=$(( SECONDS + 600 ))   # 10 min < timeout-minutes: 15
+          STATUS="Pending"
+          while :; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$CMD_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" --output text 2>/dev/null || echo "Unknown")
+            echo "Statut SSM : $STATUS"
+            case "$STATUS" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+            if [ "$SECONDS" -ge "$DEADLINE" ]; then
+              echo "Deadline CI atteinte, commande toujours '$STATUS' → annulation."
+              cancel_ssm
+              STATUS="TimedOut"
+              break
+            fi
+            sleep 15
+          done
+          trap - INT TERM
+
+          echo "----- Sortie standard du script -----"
+          aws ssm get-command-invocation \
+            --command-id "$CMD_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query "StandardOutputContent" --output text || true
+          echo "----- Sortie erreur du script -----"
+          aws ssm get-command-invocation \
+            --command-id "$CMD_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query "StandardErrorContent" --output text || true
+
+          [ "$STATUS" = "Success" ] || { echo "Déploiement en échec : $STATUS"; exit 1; }
+
+      - name: Smoke test public
+        run: curl -fsS https://immobudget.cloudsecops-services.com/ | grep -q ImmoBudget
