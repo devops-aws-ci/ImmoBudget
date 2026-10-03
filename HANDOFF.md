@@ -24,9 +24,10 @@ Question à laquelle il répond : *« Si j'utilise une épargne dédiée pour co
 | Début du crédit | **juin 2021** (constante dans le code) |
 | Durée totale | 20 ans (240 mensualités) |
 | Épargne disponible | 125 488 € |
-| Mensualités restantes (oct. 2026) | 176 (calculé automatiquement) |
+| Mensualités déjà payées (oct. 2026) | 65 (calculé automatiquement, mois en cours inclus) |
+| Mensualités restantes (oct. 2026) | 175 (calculé automatiquement) |
 
-Avec ces valeurs, en octobre 2026 : 125 488 ÷ 176 = 713 €/mois de complément, soit **1 000 €/mois** payés depuis les revenus.
+Avec ces valeurs, en octobre 2026 : 125 488 ÷ 175 ≈ 717 €/mois de complément, soit **≈ 996 €/mois** payés depuis les revenus.
 
 ---
 
@@ -66,7 +67,7 @@ ImmoBudget/
 | # | Section | IDs principaux |
 |---|---|---|
 | 0 | En-tête + bouton thème | `themeBtn` |
-| 1 | **Paramètres du crédit** (saisies) | `mens`, `rest`, `epargne` |
+| 1 | **Paramètres du crédit** (saisies) | `mens`, `paidM` (mensualités déjà payées), `rest`, `epargne` |
 | 2 | **Résultat principal** (lissage) | `heroReal`, `heroComp`, `heroNeed`, `heroBanner`/`heroBannerTxt`, `mUsed`, `mIncome`, `mMonths`, `mLeft`, `mFull`, `mShare` |
 | 3 | **Mode inverse** | `target`, `targetRange`, `rangeMax`, `quickBtns`, `invComp`, `invNeed`, `invBanner`/`invBannerTxt` |
 | 4 | **Tableau des objectifs** | `goalsBody` |
@@ -74,7 +75,7 @@ ImmoBudget/
 | 6 | **Synthèse** | `sTotal`, `sPaid`, `sLeft`, `sEp`, `sEq`, `sMens`, `sReal`, `sComp` |
 | 7 | Avertissement en pied de page | — |
 
-Champs de saisie (tous `type="number"`) : `mens`, `rest`, `epargne`, `target`, `total`, `paid`, ainsi que le curseur `targetRange`.
+Champs de saisie (tous `type="number"`) : `mens`, `paidM`, `rest`, `epargne`, `target`, `total`, `paid`, ainsi que le curseur `targetRange`.
 
 ### 3.3 JavaScript
 
@@ -90,8 +91,9 @@ Tout le code est dans une IIFE. Fonctions, dans l'ordre du fichier :
 | `banner(id, txtId, cls, ic, txt)` | Met à jour une bannière (classe, icône, texte). |
 | `GOALS` | `[1500,1400,1300,1200,1100,1000]` : objectifs du tableau et des boutons rapides. |
 | `START_YEAR`, `START_MONTH` | `2021`, `5` (juin, mois **0-indexé**). |
-| `monthsElapsed()` | Mois écoulés entre juin 2021 et le mois courant (`new Date()`). |
-| `syncRest()` | `rest = round(total × 12) − monthsElapsed()` (minimum 0). |
+| `monthsPaidToDate()` | Mensualités prélevées de juin 2021 au mois courant **inclus** (`new Date()`). |
+| `totalMonths()` | `round(total × 12)` ou `NaN`. |
+| `syncFromPaidMonths()` | À partir de `paidM` → `rest = totalMonths − paidM`, `paid = paidM / 12`. |
 | `recompute()` | **Point d'entrée unique du calcul.** Calcule la section 2, puis appelle les quatre fonctions ci-dessous. |
 | `computeInverse(...)` | Section 3. |
 | `buildGoals(...)` | Section 4 (reconstruit le `<tbody>`). |
@@ -103,12 +105,12 @@ Tout le code est dans une IIFE. Fonctions, dans l'ordre du fichier :
 
 **Flux des événements**
 
-- `input` sur `mens`, `rest`, `epargne`, `target`, `total` ou `paid` déclenche `recompute()`, avec des effets propres à certains champs :
-  - `mens` → `syncRangeMax()` ;
-  - `total` → `syncRest()` ;
+- Les champs `mens`, `paidM`, `rest` et `paid` sont en **lecture seule** (`readonly`, `tabindex="-1"`, style `.inp input[readonly]`) : ils n'ont pas d'écouteur.
+- `input` sur `epargne`, `target` ou `total` déclenche `recompute()`, avec des effets propres à certains champs :
+  - `total` → `syncFromPaidMonths()` ;
   - `target` → synchronise le curseur et `markQuick()`.
 - `input` sur `targetRange` → met à jour `target`, appelle `markQuick()` puis `recompute()`.
-- Initialisation : `syncRest()`, `buildQuick()`, `syncRangeMax()`, `markQuick()`, `recompute()`.
+- Initialisation : `paidM = monthsPaidToDate()`, `syncFromPaidMonths()`, `buildQuick()`, `syncRangeMax()`, `markQuick()`, `recompute()`.
 
 ---
 
@@ -159,12 +161,14 @@ Pour chaque `g` de `GOALS` :
 ### 4.5 Mensualités restantes automatiques
 
 ```
-monthsElapsed = (année_courante − 2021) × 12 + (mois_courant_0idx − 5)
-N = round(total_ans × 12) − monthsElapsed
+paidM = (année_courante − 2021) × 12 + (mois_courant_0idx − 5) + 1
+N     = round(total_ans × 12) − paidM
+paid  = paidM / 12   (années, arrondi à 2 décimales)
 ```
 
-Exemple : octobre 2026 → 60 + 4 = 64 mois écoulés → N = 240 − 64 = **176**.
-Convention : le mois en cours est compté comme **restant**. L'utilisateur peut toujours modifier `rest` à la main ; la valeur est recalculée au rechargement de la page et à chaque changement de `total`.
+Exemple : octobre 2026 → 60 + 4 + 1 = **65** mensualités payées → N = 240 − 65 = **175**, `paid` = 5,42 ans.
+Convention : la 1re mensualité est prélevée en juin 2021 et le mois en cours est compté comme **déjà prélevé**.
+`paidM`, `rest` et `paid` sont en lecture seule et calculés uniquement à partir de la date du jour et de `total`. La mensualité `mens` (1 713 €) est aussi en lecture seule : pour la changer, modifier l'attribut `value` dans le HTML.
 
 ---
 
@@ -178,9 +182,10 @@ c81bfcd Add mortgage savings treasury simulator
 1013a15 Initial commit
 ```
 
-### Modification non commitée
+### Évolutions récentes
 
-Dans `index.html` : `rest` n'est plus fixé à `176`. Il est calculé par `syncRest()` à partir de la date du jour et de juin 2021. Les changements sont visibles avec `git diff`.
+- `95d4a8a` : `rest` calculé selon le mois en cours, et création de ce document.
+- Non commité (voir `git diff`) : indicateurs `mFull` / `mShare` ; champ `paidM` « Mensualités déjà payées » (mois en cours inclus) ; `mens`, `paidM`, `rest` et `paid` passés en lecture seule.
 
 > Remarque : les fichiers appartenaient auparavant à `root`. Si une écriture échoue avec `EACCES`, demandez à l'utilisateur de lancer `sudo chown -R $USER:$USER <repo>`.
 
@@ -190,13 +195,12 @@ Dans `index.html` : `rest` n'est plus fixé à `176`. Il est calculé par `syncR
 
 À traiter en priorité, dans cet ordre :
 
-1. **Incohérence entre `paid` et `rest` (priorité haute).** `paid` (« Années déjà payées ») est fixé à `5` dans le HTML, alors que `rest` est calculé depuis la date du jour (64 mois payés en oct. 2026, soit 5 ans 4 mois). Résultat : les sections Durée et Synthèse affichent « Restant 15 ans » (180 mois) alors que le simulateur utilise 176 mois.
-   *Correction suggérée :* calculer aussi `paid = monthsElapsed() / 12` au chargement (et mettre à jour le texte `.hint`), ou dériver `paid` de `total − rest/12`.
+1. ~~Incohérence entre `paid` et `rest`~~ — **corrigé** : `paidM`, `rest` et `paid` sont calculés ensemble.
 2. **Valeurs périmées quand la mensualité est invalide.** Dans `recompute()`, la branche `!validMens` ne réinitialise que `heroReal` et la bannière : `heroComp`, `heroNeed`, `mUsed`, `mIncome`, `mMonths` et `mLeft` gardent leurs anciennes valeurs. `heroReal` perd aussi son `<small>/ mois</small>`.
 3. **« Mois couverts par l'épargne » faux quand l'épargne vaut 0.** `mMonths` affiche toujours `N mois`, même quand `E = 0` ; il devrait afficher 0.
 4. **Message trompeur quand `rest` est vide.** `NaN` déclenche « le crédit est déjà terminé » au lieu d'inviter à remplir le champ. Il faut distinguer `rest === 0` de `rest` invalide.
 5. *(Optionnel)* Le libellé « Épargne nécessaire jusqu'à la fin » (`heroNeed`) affiche `usable`, ce qui fait doublon avec l'épargne saisie. À reformuler en « Épargne mobilisée », ou à remplacer par `M × N`.
-6. *(Optionnel)* La date de début (juin 2021) est codée en dur. On pourrait ajouter un champ « Date de début » (`type="month"`), dont `syncRest()` et `paid` dépendraient.
+6. *(Optionnel)* La date de début (juin 2021) est codée en dur. On pourrait ajouter un champ « Date de début » (`type="month"`), dont `monthsPaidToDate()` dépendrait.
 7. *(Optionnel)* Supprimer `money2` (non utilisée) ou s'en servir.
 
 Non-objectifs, sauf demande explicite : intérêts de l'épargne, tableau d'amortissement, remboursement anticipé, backend, framework, build.
@@ -222,14 +226,15 @@ Ouvrir `index.html` et vérifier avec les valeurs par défaut (en octobre 2026) 
 
 | Contrôle | Attendu |
 |---|---|
-| `rest` au chargement | 176 (diminue de 1 chaque mois) |
-| Résultat principal | **1 000 € / mois**, complément 713 € / mois, épargne restante à la fin 0 €, 73 mensualités complètes couvertes, part couverte 41,6 % |
-| Mode inverse, objectif 1 000 € | complément 713 €, épargne nécessaire 125 488 €, bannière « suffit… juste ce qu'il faut » |
-| Objectif 1 500 € | nécessaire 37 488 €, surplus 88 000 € |
-| Objectif 0 € | nécessaire 301 488 € (1 713 × 176), épargne épuisée après 73 mois |
-| `total` = 25 | `rest` devient 236 |
+| Au chargement | `paidM` = 65 (augmente de 1 chaque mois), `rest` = 175, `paid` = 5,42 ; Synthèse « Déjà payé 5 ans 5 mois », « Restant 14 ans 7 mois » |
+| Résultat principal | **996 € / mois**, complément 717 € / mois, épargne restante à la fin 0 €, 73 mensualités complètes couvertes, part couverte 41,9 % |
+| Mode inverse, objectif 1 000 € | complément 713 €, épargne nécessaire 124 775 €, surplus 713 € |
+| Objectif 1 500 € | nécessaire 37 275 €, surplus 88 213 € |
+| Objectif 0 € | nécessaire 299 775 € (1 713 × 175), épargne épuisée après 73 mois |
+| `total` = 25 | `rest` devient 235 |
+| Mensualité, mensualités payées/restantes, années payées | non modifiables (lecture seule, grisés) |
 | Épargne = 0 | 1 713 € / mois depuis les revenus |
-| Épargne = 400 000 | couverture totale, surplus 98 512 € |
+| Épargne = 400 000 | couverture totale, surplus 100 225 € |
 | Bouton 🌓 | bascule le thème, conservé après rechargement |
 
-Pour tester une autre date : les fonctions sont dans une IIFE, donc inaccessibles depuis la console. Modifiez temporairement `monthsElapsed()` (par exemple `var now = new Date(2027, 0, 15);`), rechargez la page, puis annulez la modification. Pour janvier 2027 : 67 mois écoulés, `rest` = 173.
+Pour tester une autre date : les fonctions sont dans une IIFE, donc inaccessibles depuis la console. Modifiez temporairement `monthsPaidToDate()` (par exemple `var now = new Date(2027, 0, 15);`), rechargez la page, puis annulez la modification. Pour janvier 2027 : `paidM` = 68, `rest` = 172.

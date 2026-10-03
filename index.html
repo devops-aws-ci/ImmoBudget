@@ -89,6 +89,7 @@
     -moz-appearance:textfield;
   }
   .inp input::-webkit-outer-spin-button,.inp input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .inp input[readonly]{background:var(--bg);color:var(--muted);cursor:not-allowed}
   .inp input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
   .inp .unit{position:absolute;right:14px;color:var(--muted);font-weight:600;pointer-events:none}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -178,17 +179,22 @@
     <h2>Paramètres du crédit</h2>
     <div class="field">
       <label for="mens">Mensualité contractuelle</label>
-      <div class="inp"><input id="mens" type="number" inputmode="decimal" step="1" value="1713"><span class="unit">€ / mois</span></div>
+      <div class="inp"><input id="mens" type="number" readonly tabindex="-1" inputmode="decimal" step="1" value="1713"><span class="unit">€ / mois</span></div>
     </div>
     <div class="grid2">
       <div class="field">
-        <label for="rest">Mensualités restantes auto calculé </label>
-        <div class="inp"><input id="rest" type="number" inputmode="numeric" step="1" value=""><span class="unit">mois</span></div>
+        <label for="paidM">Mensualités déjà payées auto calculé</label>
+        <div class="inp"><input id="paidM" type="number" readonly tabindex="-1" inputmode="numeric" step="1" value=""><span class="unit">mois</span></div>
+        <span class="hint">Depuis juin 2021, mois en cours inclus (considéré comme déjà prélevé).</span>
       </div>
       <div class="field">
-        <label for="epargne">Épargne disponible</label>
-        <div class="inp"><input id="epargne" type="number" inputmode="decimal" step="1" value="125488"><span class="unit">€</span></div>
+        <label for="rest">Mensualités restantes auto calculé </label>
+        <div class="inp"><input id="rest" type="number" readonly tabindex="-1" inputmode="numeric" step="1" value=""><span class="unit">mois</span></div>
       </div>
+    </div>
+    <div class="field">
+      <label for="epargne">Épargne disponible</label>
+      <div class="inp"><input id="epargne" type="number" inputmode="decimal" step="1" value="125488"><span class="unit">€</span></div>
     </div>
   </section>
 
@@ -250,8 +256,8 @@
       </div>
       <div class="field">
         <label for="paid">Années déjà payées</label>
-        <div class="inp"><input id="paid" type="number" inputmode="decimal" step="0.25" value="5"><span class="unit">ans</span></div>
-        <span class="hint">Crédit débuté en juin 2021 — saisissez des décimales (ex. 5,25 = 5 ans 3 mois).</span>
+        <div class="inp"><input id="paid" type="number" readonly tabindex="-1" inputmode="decimal" step="0.25" value="5"><span class="unit">ans</span></div>
+        <span class="hint">Synchronisé avec « Mensualités déjà payées » — décimales possibles (ex. 5,25 = 5 ans 3 mois).</span>
       </div>
     </div>
     <div class="metrics">
@@ -324,17 +330,24 @@
 
   var GOALS = [1500,1400,1300,1200,1100,1000];
 
-  // ---------- Mensualités restantes selon le mois en cours ----------
-  // Crédit débuté en juin 2021 (mois 0-indexé : 5)
+  // ---------- Mensualités payées / restantes selon le mois en cours ----------
+  // Crédit débuté en juin 2021 (mois 0-indexé : 5), 1re mensualité prélevée en juin 2021
   var START_YEAR = 2021, START_MONTH = 5;
-  function monthsElapsed(){
+  // Mensualités déjà prélevées, mois en cours inclus
+  function monthsPaidToDate(){
     var now = new Date();
-    return Math.max(0, (now.getFullYear() - START_YEAR) * 12 + (now.getMonth() - START_MONTH));
+    return Math.max(0, (now.getFullYear() - START_YEAR) * 12 + (now.getMonth() - START_MONTH) + 1);
   }
-  function syncRest(){
+  function totalMonths(){
     var total = num('total');
-    if(!isFinite(total) || total <= 0) return;
-    $('rest').value = Math.max(0, Math.round(total * 12) - monthsElapsed());
+    return (isFinite(total) && total > 0) ? Math.round(total * 12) : NaN;
+  }
+  // Mensualités déjà payées → met à jour restantes et années payées
+  function syncFromPaidMonths(){
+    var tm = totalMonths(), pm = num('paidM');
+    if(!isFinite(tm) || !isFinite(pm) || pm < 0) return;
+    $('rest').value = Math.max(0, tm - pm);
+    $('paid').value = Math.round(pm / 12 * 100) / 100;
   }
 
   // ---------- Calcul principal ----------
@@ -557,10 +570,10 @@
   }
 
   // ---------- Câblage des événements ----------
-  ['mens','rest','epargne','target','total','paid'].forEach(function(id){
+  // mens, paidM, rest et paid sont en lecture seule (calculés)
+  ['epargne','target','total'].forEach(function(id){
     $(id).addEventListener('input', function(){
-      if(id === 'mens') syncRangeMax();
-      if(id === 'total') syncRest();
+      if(id === 'total') syncFromPaidMonths();
       if(id === 'target'){
         var v = num('target');
         if(isFinite(v)) $('targetRange').value = v;
@@ -593,7 +606,8 @@
   })();
 
   // ---------- Init ----------
-  syncRest();
+  $('paidM').value = monthsPaidToDate();
+  syncFromPaidMonths();
   buildQuick();
   syncRangeMax();
   markQuick();
