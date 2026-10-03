@@ -67,7 +67,7 @@ ImmoBudget/
 |---|---|---|
 | 0 | En-tête + bouton thème | `themeBtn` |
 | 1 | **Paramètres du crédit** (saisies) | `mens`, `rest`, `epargne` |
-| 2 | **Résultat principal** (lissage) | `heroReal`, `heroComp`, `heroNeed`, `heroBanner`/`heroBannerTxt`, `mUsed`, `mIncome`, `mMonths`, `mLeft` |
+| 2 | **Résultat principal** (lissage) | `heroReal`, `heroComp`, `heroNeed`, `heroBanner`/`heroBannerTxt`, `mUsed`, `mIncome`, `mMonths`, `mLeft`, `mFull`, `mShare` |
 | 3 | **Mode inverse** | `target`, `targetRange`, `rangeMax`, `quickBtns`, `invComp`, `invNeed`, `invBanner`/`invBannerTxt` |
 | 4 | **Tableau des objectifs** | `goalsBody` |
 | 5 | **Durée du crédit** | `total` (ans), `paid` (ans), `dPaid`, `dLeft`, `coverEp`, `coverEq` |
@@ -123,6 +123,8 @@ usable   = min(E, M × N)        // on ne peut pas utiliser plus que ce qui rest
 perMonth = usable / N           // complément pris dans l'épargne chaque mois
 real     = M − perMonth         // payé depuis les revenus
 leftEnd  = E − usable           // surplus d'épargne à la fin (0 sauf si E > M×N)
+mFull    = floor(E / M)         // mensualités complètes que l'épargne paierait à elle seule
+mShare   = perMonth / M         // part de chaque mensualité financée par l'épargne (%)
 ```
 
 Bannières :
@@ -221,7 +223,7 @@ Ouvrir `index.html` et vérifier avec les valeurs par défaut (en octobre 2026) 
 | Contrôle | Attendu |
 |---|---|
 | `rest` au chargement | 176 (diminue de 1 chaque mois) |
-| Résultat principal | **1 000 € / mois**, complément 713 € / mois, épargne restante à la fin 0 € |
+| Résultat principal | **1 000 € / mois**, complément 713 € / mois, épargne restante à la fin 0 €, 73 mensualités complètes couvertes, part couverte 41,6 % |
 | Mode inverse, objectif 1 000 € | complément 713 €, épargne nécessaire 125 488 €, bannière « suffit… juste ce qu'il faut » |
 | Objectif 1 500 € | nécessaire 37 488 €, surplus 88 000 € |
 | Objectif 0 € | nécessaire 301 488 € (1 713 × 176), épargne épuisée après 73 mois |

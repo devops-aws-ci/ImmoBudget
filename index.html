@@ -205,6 +205,8 @@
       <div class="metric"><div class="k">Payé depuis mes revenus</div><div class="v" id="mIncome">—</div></div>
       <div class="metric"><div class="k">Mois couverts par l'épargne</div><div class="v" id="mMonths">—</div></div>
       <div class="metric"><div class="k">Épargne restante à la fin</div><div class="v" id="mLeft">—</div></div>
+      <div class="metric"><div class="k">Mensualités complètes couvertes par l'épargne disponible</div><div class="v" id="mFull">—</div></div>
+      <div class="metric"><div class="k">Part de la mensualité couverte</div><div class="v" id="mShare">—</div></div>
     </div>
   </section>
 
@@ -291,6 +293,7 @@
   // ---------- Formatage ----------
   var eur0 = new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0});
   var eur2 = new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
+  var pct  = new Intl.NumberFormat('fr-FR',{style:'percent',minimumFractionDigits:1,maximumFractionDigits:1});
   function money(x){ if(!isFinite(x)) return '—'; return eur0.format(Math.round(x)); }
   function money2(x){ if(!isFinite(x)) return '—'; return eur2.format(x); }
 
@@ -354,6 +357,7 @@
       banner('heroBanner','heroBannerTxt','warn','⏳','Aucune mensualité restante : le crédit est déjà terminé.');
       set('heroComp','—'); set('heroNeed','—');
       set('mUsed','—'); set('mIncome','—'); set('mMonths','—'); set('mLeft','—');
+      set('mFull','—'); set('mShare','—');
     }
 
     if(validMens && validRest){
@@ -374,6 +378,10 @@
       set('mIncome', money(real));
       set('mMonths', rest + ' mois');
       set('mLeft', money(leftEnd));
+      // Nombre de mensualités complètes que l'épargne disponible paierait à elle seule
+      set('mFull', Math.floor(e / mens) + ' mois');
+      // Part de chaque mensualité financée par l'épargne lissée
+      set('mShare', pct.format(perMonth / mens));
 
       if(e <= 0){
         banner('heroBanner','heroBannerTxt','warn','ℹ️',
