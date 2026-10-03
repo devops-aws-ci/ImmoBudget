@@ -183,7 +183,7 @@
     <div class="grid2">
       <div class="field">
         <label for="rest">Mensualités restantes</label>
-        <div class="inp"><input id="rest" type="number" inputmode="numeric" step="1" value="176"><span class="unit">mois</span></div>
+        <div class="inp"><input id="rest" type="number" inputmode="numeric" step="1" value=""><span class="unit">mois</span></div>
       </div>
       <div class="field">
         <label for="epargne">Épargne disponible</label>
@@ -320,6 +320,19 @@
   }
 
   var GOALS = [1500,1400,1300,1200,1100,1000];
+
+  // ---------- Mensualités restantes selon le mois en cours ----------
+  // Crédit débuté en juin 2021 (mois 0-indexé : 5)
+  var START_YEAR = 2021, START_MONTH = 5;
+  function monthsElapsed(){
+    var now = new Date();
+    return Math.max(0, (now.getFullYear() - START_YEAR) * 12 + (now.getMonth() - START_MONTH));
+  }
+  function syncRest(){
+    var total = num('total');
+    if(!isFinite(total) || total <= 0) return;
+    $('rest').value = Math.max(0, Math.round(total * 12) - monthsElapsed());
+  }
 
   // ---------- Calcul principal ----------
   function recompute(){
@@ -539,6 +552,7 @@
   ['mens','rest','epargne','target','total','paid'].forEach(function(id){
     $(id).addEventListener('input', function(){
       if(id === 'mens') syncRangeMax();
+      if(id === 'total') syncRest();
       if(id === 'target'){
         var v = num('target');
         if(isFinite(v)) $('targetRange').value = v;
@@ -571,6 +585,7 @@
   })();
 
   // ---------- Init ----------
+  syncRest();
   buildQuick();
   syncRangeMax();
   markQuick();
